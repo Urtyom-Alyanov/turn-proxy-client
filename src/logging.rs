@@ -1,7 +1,8 @@
-use tracing_subscriber::{fmt,prelude::*,EnvFilter};
+use tracing_appender::non_blocking::WorkerGuard;
+use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
-pub fn init_logger() {
-  let (non_blocking, _guard) = tracing_appender::non_blocking(std::io::stdout());
+pub fn init_logger() -> WorkerGuard {
+  let (non_blocking, guard) = tracing_appender::non_blocking(std::io::stdout());
 
   let filter = EnvFilter::try_from_default_env()
     .unwrap_or_else(|_| EnvFilter::new("info"));
@@ -10,4 +11,6 @@ pub fn init_logger() {
     .with(filter)
     .with(fmt::layer().with_writer(non_blocking))
     .init();
+  
+  guard
 }

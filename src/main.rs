@@ -1,12 +1,18 @@
 pub mod providers;
-pub mod args;
 pub mod logging;
+pub mod configuration;
 
-use tokio::net::{UdpSocket};
-use std::sync::Arc;
-use std::net::SocketAddr;
+use crate::configuration::init_configuration::init_config;
+use crate::logging::init_logger;
+
+use anyhow::Result;
+use tracing::info;
 
 #[tokio::main(flavor = "current_thread")]
-fn main() {
-  let args = Args::parse();
+async fn main() -> Result<()> {
+  let _guard = init_logger();
+  let config = init_config()?;
+
+  info!("Hello, world!");
+  Ok(())
 }
