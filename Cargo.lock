@@ -2774,6 +2774,7 @@ dependencies = [
  "anyhow",
  "clap",
  "dtls",
+ "futures-util",
  "rcgen",
  "reqwest",
  "serde",
