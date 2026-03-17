@@ -4,6 +4,7 @@ use crate::proxy_process::turn_configure::TurnCredentials;
 use crate::providers::USER_AGENT;
 use crate::providers::yandex::datatypes::{ConferenceResponse, HelloPayload, HelloRequest, WssResponse};
 
+use std::sync::LazyLock;
 use anyhow::{anyhow, Context, Result};
 use reqwest::header::{HeaderMap, HeaderValue};
 use serde_json::json;
@@ -12,13 +13,16 @@ use uuid::Uuid;
 use tokio_tungstenite::tungstenite::handshake::client::{Request as TungsteniteRequest};
 use tokio_tungstenite::tungstenite::protocol::Message;
 
+use futures_util::sink::SinkExt;
+use futures_util::stream::StreamExt;
+
 const YANDEX_REALM: &str = "yandex";
 const YANDEX_SERVICE_NAME: &str = "telemost";
-const YANDEX_SDK_INFO: serde_json::Value = json!({
+static YANDEX_SDK_INFO: LazyLock<serde_json::Value> = LazyLock::new(||json!({
   "implementation": "browser", "version": "5.15.0",
   "userAgent": USER_AGENT, "hwConcurrency": 4
-});
-const YANDEX_CAPABILITIES_OFFER: serde_json::Value = json!({
+}));
+static YANDEX_CAPABILITIES_OFFER: LazyLock<serde_json::Value> = LazyLock::new(||json!({
   "offerAnswerMode": ["SEPARATE"],
   "initialSubscriberOffer": ["ON_HELLO"],
   "slotsMode": ["FROM_CONTROLLER"],
@@ -40,7 +44,7 @@ const YANDEX_CAPABILITIES_OFFER: serde_json::Value = json!({
   "svcMode": ["SVC_MODE_DISABLED"],
   "subscriberOfferAsyncAck": ["SUBSCRIBER_OFFER_ASYNC_ACK_DISABLED"],
   "svcModes": ["FALSE"], "reportTelemetryModes": ["TRUE"], "keepDefaultDevicesModes": ["TRUE"]
-});
+}));
 
 pub async fn get_yandex_telebridge_turn_credentials(call_id: &str, with_name: Option<String>) -> Result<TurnCredentials> {
   let client = reqwest::Client::new();
