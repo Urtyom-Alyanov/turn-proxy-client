@@ -3,7 +3,6 @@ use std::sync::Arc;
 use tokio::net::UdpSocket;
 use tracing::{debug, info};
 use turn::client::{ClientConfig as TurnClientConfig, Client as TurnClient};
-use turn::relay::relay_none::RelayAddressGeneratorNone;
 use webrtc_util::Conn;
 
 pub struct TurnCredentials {
