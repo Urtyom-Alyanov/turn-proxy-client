@@ -1,4 +1,5 @@
 use crate::proxy_process::turn_configure::TurnCredentials;
+use crate::providers::USER_AGENT;
 
 use anyhow::{anyhow, Context, Result, Ok};
 use reqwest::Client;
@@ -19,7 +20,7 @@ const VK_API_VERSION: &str = "5.264";
 /// Входит в звонок VK с анонимной учётной записью
 pub async fn get_vk_calls_turn_credentials(call_id: &str, with_name: Option<String>) -> Result<TurnCredentials> {
   let client = Client::builder()
-    .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:144.0) Gecko/20100101 Firefox/144.0")
+    .user_agent(USER_AGENT)
     .build()?;
 
   let anonymous = CallTokenCredentials {
