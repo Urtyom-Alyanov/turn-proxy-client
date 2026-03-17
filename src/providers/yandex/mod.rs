@@ -85,8 +85,8 @@ pub async fn get_yandex_telebridge_turn_credentials(call_id: &str, with_name: Op
       service_name: YANDEX_SERVICE_NAME.to_string(),
       credentials: conf_resp.credentials,
       sdk_init_id: Uuid::new_v4().to_string(),
-      sdk_info: YANDEX_SDK_INFO,
-      capabilities_offer: YANDEX_CAPABILITIES_OFFER,
+      sdk_info: YANDEX_SDK_INFO.clone(),
+      capabilities_offer: YANDEX_CAPABILITIES_OFFER.clone(),
     },
   };
 
