@@ -1,38 +1,74 @@
-use clap::Parser;
+use clap::{Parser, Subcommand, Args as ClapArgs};
+use crate::configuration::configuration::DefaultProvider;
+
+#[cfg(target_os = "windows")]
+const DEFAULT_CONFIG_PATH: &str = ".\\config.toml";
+
+#[cfg(target_os = "linux")]
+const DEFAULT_CONFIG_PATH: &str = "/etc/turn-proxy/client/config.toml";
 
 #[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
 pub struct Args {
-  #[arg(long, default_value = "127.0.0.1:51820", help = "Выходной поток UDP")]
-  pub listening_on: Option<String>,
+  #[arg(long, default_value = DEFAULT_CONFIG_PATH, help = "Путь к конфигурации")]
+  pub config: String,
 
-  #[arg(long, help = "Количество потоков (участников) в видеоконференции")]
-  pub threads: Option<i32>,
-
-  #[arg(long, help = "Сервер назначения")]
-  pub peer_address: Option<String>,
-
-  #[arg(long, help = "Поставщик TURN сервера")]
-  pub provider: Option<String>,
-
-  #[arg(long, help = "Использовать только аргументы строки")]
+  #[arg(long, help = "Не использовать конфигурационный файл")]
   pub no_config: bool,
 
-  #[arg(
-    long,
-    help = "Использовать UDP для подключения к TURN серверу"
-  )]
-  pub not_using_udp: bool,
+  #[arg(long, help = "Слушать выходной адрес")]
+  pub listening_on: String,
 
-  #[arg(
-    long,
-    help = "Использовать DTLS для шифрования и обфускации трафика"
-  )]
-  pub not_using_dtls_obfuscation: bool,
+  #[arg(long, help = "Адрес назначения")]
+  pub peer_addr: String,
 
-  #[arg(
-    long,
-    default_value = "/etc/turn-proxy/client/config.toml",
-    help = "Путь к конфигурационному файлу"
-  )]
-  pub config: String
+  #[command(flatten)]
+  pub provider_common: ProviderCliArgs,
+
+  #[command(subcommand)]
+  pub provider_type: Option<ProviderType>,
+}
+
+#[derive(ClapArgs, Debug)]
+pub struct ProviderCliArgs {
+  /// Количество потоков, выглядит как количество участников в конференции, большие значения могут
+  /// вызвать подозрения, так как с одного IP адреса идёт подключается одновременно к одному звонку
+  /// условно 16 человек, что, довольно, странно.
+  ///
+  /// Если поставщик direct, то поле игнорируется
+  ///
+  /// Не рекомендуется указывать большие значения, однако может существенно увеличить скорость, если
+  /// со стороны поставщика имеется ограничение по скорости для участника конференции.
+  #[arg(long, help = "Количество потоков (участников в звонке), игнорируется при direct")]
+  pub threads: Option<u32>,
+
+  #[arg(long, default_value_t = true, help = "Использовать UDP")]
+  pub using_udp: bool,
+
+  #[arg(long, default_value_t = true, help = "Использовать DTLS обфускацию, не рекомендуется отключать \
+    при использовании TURN-сервера")]
+  pub using_dtls_obfuscation: bool,
+}
+
+#[derive(Subcommand, Debug)]
+pub enum ProviderType {
+  Direct,
+  Default {
+    #[arg(long, help = "Выбранный провайдер")]
+    kind: DefaultProvider, // Доступные провайдеры
+    #[arg(long, help = "Ссылка на звонок/конференцию")]
+    link: String,
+  },
+  Custom {
+    #[arg(long, help = "Имя пользователя для TURN")]
+    username: String,
+    #[arg(long, help = "Пароль для TURN")]
+    password: String,
+    #[arg(long, help = "Адрес TURN-сервера")]
+    turn_address: String,
+    #[arg(long, help = "Адрес STUN-сервера")]
+    stun_address: String,
+    #[arg(long, help = "Realm конференции")]
+    realm: String,
+  },
 }
