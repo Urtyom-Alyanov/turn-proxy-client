@@ -14,13 +14,46 @@ tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 tracing-appender = "0.2.4"
 tokio = { version = "1.50.0", features = ["full"] }
 toml = "1.0.6"
-webrtc-dtls = "0.12.0"
+dtls = "0.17.1"
 serde = { version = "1.0.228", features = ["derive"] }
 clap = { version = "4.6.0", features = ["derive"] }
+turn = "0.17.1"
 anyhow = "1.0.102"
-webrtc-util = { version = "0.11.0", features = ["conn"] }
+webrtc-util = { version = "0.17.1", features = ["conn"] }
 tokio-util = "0.7.18"
+reqwest = { version = "0.13.2", features = ["json", "form"] }
+serde_json = "1.0.149"
+uuid = { version = "1.22.0", features = ["v4"] }
 
 [profile.dist]
 inherits = "release"
 lto = "thin"
+
+[package.metadata.deb]
+maintainer = "Urtyom Alyanov <urtyomalyanov@gmail.com>"
+maintainer-scripts = "dist-specific/deb"
+copyright = "2026, Urtyom Alyanov"
+license-file = ["LICENSE", "4"]
+extended-description = """
+DTLS proxy client designed to relay UDP traffic through TURN servers
+to bypass restrictive networks or analyze video call traffic.
+"""
+assets = [
+    ["target/release/turn-proxy-client", "/usr/local/bin/turn-proxy-client", "755"],
+    ["services/systemd/turn-proxy-client.service", "/lib/systemd/system/turn-proxy-client.service", "644"],
+    ["example.toml", "/etc/turn-proxy/client/config.toml", "644"],
+]
+
+[package.metadata.generate-rpm]
+assets = [
+    { source = "target/release/turn-proxy-client", dest = "/usr/local/bin/turn-proxy-client", mode = "755" },
+    { source = "services/systemd/turn-proxy-client.service", dest = "/usr/lib/systemd/system/turn-proxy-client.service", mode = "644" },
+    { source = "example.toml", dest = "/etc/turn-proxy/client/config.toml", mode = "644" }
+]
+post_install = """
+systemctl daemon-reload
+"""
+pre_uninstall = """
+systemctl stop turn-proxy-client || true
+systemctl disable turn-proxy-client || true
+"""
