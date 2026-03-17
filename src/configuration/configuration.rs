@@ -1,5 +1,28 @@
 use serde::Deserialize;
 
+#[derive(clap::ValueEnum, Deserialize, Clone, Debug)]
+#[serde(rename_all = "snake_case")]
+pub enum DefaultProvider {
+  VKCalls,
+  YandexTelemost,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(tag = "provider", rename_all = "snake_case")]
+pub enum ProviderDetails {
+  Direct,
+  Default {
+    kind: DefaultProvider,
+    link: String,
+  },
+  Custom {
+    username: String,
+    password: String,
+    turn_address: String,
+    stun_address: String,
+  }
+}
+
 #[derive(Deserialize, Debug)]
 pub struct CommonConfiguration {
   /// Адрес входа/выхода
@@ -10,25 +33,35 @@ pub struct CommonConfiguration {
 
 #[derive(Deserialize, Debug)]
 pub struct ProviderConfiguration {
+  /// Приоритет, если не задан то Direct -> Custom -> Yandex.Telemost -> VK Calls
+  pub priority: Option<u32>,
   /// Не использовать UDP для TURN сервера поставщика (может понизить скорость), не знаю зачем
   /// это кому-то, на другие параметры не влияет
-  pub not_using_udp: bool,
+  ///
+  /// По умолчанию `true`
+  pub using_udp: bool,
   /// Не использовать DTLS обфускацию для поставщика (может увеличить скорость, но также может
-  /// увеличить шанс на блокировку
+  /// увеличить шанс на блокировку)
+  ///
+  /// По умолчанию `true`.
   ///
   /// НЕ РЕКОМЕНДУЕТСЯ ОТКЛЮЧАТЬ
-  pub not_using_dtls_obfuscation: bool,
+  pub using_dtls_obfuscation: bool,
+  /// Специфичные поля для разных поставщиков TURN серверов (в том числе и Direct)
+  pub details: ProviderDetails,
   /// Количество потоков, выглядит как количество участников в конференции, большие значения могут
   /// вызвать подозрения, так как с одного IP адреса идёт подключается одновременно к одному звонку
   /// условно 16 человек, что, довольно, странно.
   ///
+  /// Если поставщик direct, то поле игнорируется
+  ///
   /// Не рекомендуется указывать большие значения, однако может существенно увеличить скорость, если
   /// со стороны поставщика имеется ограничение по скорости для участника конференции.
-  pub threads: Option<i32>,
+  threads: Option<i32>,
 }
 
 #[derive(Deserialize, Debug)]
 pub struct AppConfiguration {
   common: CommonConfiguration,
-  provider: ProviderConfiguration,
+  providers: Vec<ProviderConfiguration>,
 }
