@@ -1,6 +1,4 @@
 use anyhow::Result;
-use std::net::{SocketAddr, UdpSocket};
-use std::sync::Arc;
 use rcgen::{CertificateParams, KeyPair, PKCS_ECDSA_P256_SHA256};
 use tracing::error;
 use dtls::cipher_suite::CipherSuiteId;
