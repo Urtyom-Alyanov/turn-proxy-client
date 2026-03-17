@@ -42,7 +42,7 @@ pub async fn get_vk_calls_turn_credentials(call_id: &str, with_name: Option<Stri
   let call_token = call_token?;
   let okcdn_token = okcdn_token?;
 
-  Ok(join_into_video_conversation(&client, call_id, call_token, okcdn_token))
+  Ok(join_into_video_conversation(&client, call_id, call_token, okcdn_token).await?)
 }
 
 
