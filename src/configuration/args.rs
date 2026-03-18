@@ -17,19 +17,19 @@ pub struct Args {
   pub no_config: bool,
 
   #[arg(long, help = "Слушать выходной адрес")]
-  pub listening_on: String,
+  pub listening_on: Option<String>,
 
   #[arg(long, help = "Адрес назначения")]
-  pub peer_addr: String,
+  pub peer_addr: Option<String>,
 
   #[command(flatten)]
-  pub provider_common: ProviderCliArgs,
+  pub provider_common: Option<ProviderCliArgs>,
 
   #[command(subcommand)]
   pub provider_type: Option<ProviderType>,
 }
 
-#[derive(ClapArgs, Debug)]
+#[derive(ClapArgs, Debug, Default)]
 pub struct ProviderCliArgs {
   /// Количество потоков, выглядит как количество участников в конференции, большие значения могут
   /// вызвать подозрения, так как с одного IP адреса идёт подключается одновременно к одному звонку

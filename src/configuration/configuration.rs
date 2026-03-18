@@ -1,15 +1,17 @@
 use serde::Deserialize;
 
-#[derive(clap::ValueEnum, Deserialize, Clone, Debug)]
+#[derive(clap::ValueEnum, Deserialize, Clone, Debug, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum DefaultProvider {
+  #[default]
   VKCalls,
   YandexTelemost,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Default)]
 #[serde(tag = "provider", rename_all = "snake_case")]
 pub enum ProviderDetails {
+  #[default]
   Direct,
   Default {
     kind: DefaultProvider,
@@ -20,10 +22,11 @@ pub enum ProviderDetails {
     password: String,
     turn_address: String,
     stun_address: String,
+    realm: String,
   }
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Default)]
 pub struct CommonConfiguration {
   /// Адрес входа/выхода
   pub listening_on: String,
@@ -31,9 +34,9 @@ pub struct CommonConfiguration {
   pub peer_addr: String,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Default)]
 pub struct ProviderConfiguration {
-  /// Приоритет, если не задан то Direct -> Custom -> Yandex.Telemost -> VK Calls
+  /// Приоритет, если не задан то Direct -> Custom -> VK Calls -> Yandex.Telemost
   pub priority: Option<u32>,
   /// Не использовать UDP для TURN сервера поставщика (может понизить скорость), не знаю зачем
   /// это кому-то, на другие параметры не влияет
@@ -57,11 +60,13 @@ pub struct ProviderConfiguration {
   ///
   /// Не рекомендуется указывать большие значения, однако может существенно увеличить скорость, если
   /// со стороны поставщика имеется ограничение по скорости для участника конференции.
-  threads: Option<i32>,
+  pub threads: Option<i32>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Default)]
 pub struct AppConfiguration {
-  common: CommonConfiguration,
-  providers: Vec<ProviderConfiguration>,
+  #[serde(default)]
+  pub common: CommonConfiguration,
+  #[serde(default)]
+  pub providers: Vec<ProviderConfiguration>,
 }
