@@ -68,7 +68,7 @@ pub async fn get_yandex_telebridge_turn_credentials(call_id: &str, with_name: Op
 
   let name = with_name.unwrap_or("Гость".to_owned());
 
-  let mut ws_request = ws_request_builder(&conf_resp.client_configuration.media_server_url)?;
+  let ws_request = ws_request_builder(&conf_resp.client_configuration.media_server_url)?;
   let (mut ws_stream, _) = connect_async(ws_request).await
     .map_err(|e| anyhow!("WS connect error: {}", e))?;
 
@@ -124,7 +124,7 @@ pub async fn get_yandex_telebridge_turn_credentials(call_id: &str, with_name: Op
 }
 
 fn ws_request_builder(url: &str) -> Result<TungsteniteRequest> {
-  let mut request = TungsteniteRequest::builder()
+  let request = TungsteniteRequest::builder()
     .uri(url)
     .header("Origin", "https://telemost.yandex.ru")
     .header("User-Agent", USER_AGENT)
