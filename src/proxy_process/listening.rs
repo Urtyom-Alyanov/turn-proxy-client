@@ -1,16 +1,18 @@
 use crate::configuration::configuration::{AppConfiguration, DefaultProvider, ProviderConfiguration, ProviderDetails};
 
-use std::net::{SocketAddr, UdpSocket};
+use std::net::{SocketAddr};
 use std::sync::Arc;
 use std::time::Duration;
 use anyhow::{anyhow, Context, Result};
-use tokio::task::JoinSet;
+use tokio::net::UdpSocket;
+use tokio::task::{JoinHandle};
 use tokio_util::sync::CancellationToken;
 use tracing::{error, info, warn};
 use webrtc_util::Conn;
+use crate::dtls::dtls_configure::dtls_configure;
 use crate::providers::vk::{get_vk_call_id_from_link, get_vk_calls_turn_credentials};
 use crate::providers::yandex::{get_yandex_call_id_from_link, get_yandex_telebridge_turn_credentials};
-use crate::proxy_process::proxy_flow::proxy_flow;
+use crate::proxy_process::proxy_flow::{ProxyBridge};
 use crate::proxy_process::turn_configure::{turn_configure, TurnCredentials};
 
 pub async fn listening(config: AppConfiguration) -> Result<()> {
@@ -25,7 +27,6 @@ pub async fn listening(config: AppConfiguration) -> Result<()> {
   let listen_socket: Arc<UdpSocket> = Arc::new(UdpSocket::bind(listen_addr).await?);
 
   let cancel_token = CancellationToken::new();
-  let mut cancel_set = JoinSet::new();
 
   let ct = cancel_token.clone();
   tokio::spawn(async move {
@@ -39,59 +40,80 @@ pub async fn listening(config: AppConfiguration) -> Result<()> {
   providers.sort_by_key(|p| p.priority.unwrap_or(u32::MAX));
 
   loop {
+    let mut provider_active = false;
+
     for provider in &providers {
       info!("Trying provider with priority {:?}", provider.priority);
 
-      let remote_conn: Arc<dyn Conn + Send + Sync> = setup_and_run_provider(provider, &listen_socket).await?;
+      let remote_conn = match setup_and_run_provider(provider).await {
+        Ok(conn) => conn,
+        Err(e) => {
+          warn!("Failed to setup provider: {}. Trying next...", e);
+          continue;
+        }
+      };
 
       let final_conn = if provider.using_dtls_obfuscation {
-        remote_conn
+        dtls_configure(remote_conn).await.context("Failed to configure DTLS connection")?
       } else {
         remote_conn
       };
 
-      let token = CancellationToken::new();
-
-      let threads = provider.threads.unwrap_or(1) as usize;
-      let mut handles = vec![];
-
-      for i in 0..threads {
-        let flow_id = format!("PR-{}-THR-{}", provider.priority.unwrap_or(99), i);
-
-        let up = proxy_flow(
-          format!("{}-UP", flow_id),
-          listen_socket.local_addr()?,
-          final_conn.local_addr()?,
-          token.clone(),
-          listen_socket.clone(),
-          final_conn.clone(),
-          peer_addr.into()
-        );
-
-        handles.push(up);
+      let provider_token = cancel_token.child_token();
+      if let Err(e) = run_bridge_group(provider, listen_socket.clone(), final_conn, peer_addr, provider_token).await {
+        error!("Bridge failed: {}. Switching to next provider...", e);
+        continue;
       }
 
-      match final_conn {
-        Ok(_) => {
-          break;
-        }
-        Err(e) => {
-          warn!("Provider failed: {}. Moving to next priority...", e);
-          continue;
-        }
-      }
+      provider_active = true;
+      break;
     }
 
+    if !provider_active && !cancel_token.is_cancelled() {
     error!("Not available providers. Retry after 5 seconds...");
-    tokio::time::sleep(Duration::from_secs(5)).await;
+    tokio::select! {
+      _ = cancel_token.cancelled() => break,
+      _ = tokio::time::sleep(Duration::from_secs(5)) => {}
+    }
+      }
   }
 
   Ok(())
 }
 
-fn get_call_id_from_link(kind: &DefaultProvider, link: &str) -> &str {
+async fn run_bridge_group(
+  provider: &ProviderConfiguration,
+  listen_socket: Arc<UdpSocket>,
+  remote_conn: Arc<dyn Conn + Send + Sync>,
+  peer_addr: SocketAddr,
+  token: CancellationToken,
+) -> Result<()> {
+  let threads = provider.threads.unwrap_or(1) as usize;
+  let mut handles: Vec<JoinHandle<Result<()>>> = vec![];
+  let local_conn = listen_socket as Arc<dyn Conn + Send + Sync>;
+
+  for i in 0..threads {
+    let flow_id = format!("P-{}-T-{}", provider.priority.unwrap_or(0), i);
+    let bridge = ProxyBridge::new(flow_id, token.clone());
+
+    let up = bridge.run_upstream(local_conn.clone(), remote_conn.clone(), peer_addr).await?;
+    let down = bridge.run_downstream(local_conn.clone(), remote_conn.clone()).await?;
+
+    handles.push(up);
+    handles.push(down);
+  }
+
+  if let Some(result) = futures_util::future::select_all(handles).await.0.ok() {
+    result?;
+  }
+
+  token.cancel();
+  Ok(())
+}
+
+fn get_call_id_from_link<'a>(kind: &DefaultProvider, link: &'a str) -> Result<&'a str> {
   match kind {
-    DefaultProvider::VKCalls => {
+    DefaultProvider::VkCalls => {
       get_vk_call_id_from_link(link)
     }
     DefaultProvider::YandexTelemost => {
@@ -103,10 +125,10 @@ fn get_call_id_from_link(kind: &DefaultProvider, link: &str) -> &str {
 async fn fetch_creds(details: &ProviderDetails) -> Result<TurnCredentials> {
   match details {
     ProviderDetails::Default { kind, link } => {
-      let call_id = get_call_id_from_link(kind, link);
+      let call_id = get_call_id_from_link(kind, link)?;
 
       match kind {
-        DefaultProvider::VKCalls => {
+        DefaultProvider::VkCalls => {
           get_vk_calls_turn_credentials(call_id.to_owned(), None).await
         }
         DefaultProvider::YandexTelemost => {
@@ -129,11 +151,12 @@ async fn fetch_creds(details: &ProviderDetails) -> Result<TurnCredentials> {
   }
 }
 
-async fn setup_and_run_provider(provider: &ProviderConfiguration, local_socket: &Arc<UdpSocket>) -> Result<Arc<dyn Conn + Send + Sync>> {
+async fn setup_and_run_provider(provider: &ProviderConfiguration) -> Result<Arc<dyn Conn + Send + Sync>> {
   match &provider.details {
     ProviderDetails::Direct => {
       info!("Try to direct connection with server...");
-      Ok(local_socket as Arc<dyn Conn + Send + Sync>)
+      let outbound = UdpSocket::bind("0.0.0.0:0").await?;
+      Ok(Arc::new(outbound) as Arc<dyn Conn + Send + Sync>)
     }
     _ => {
       info!("Try to connection via TURN...");
@@ -143,7 +166,7 @@ async fn setup_and_run_provider(provider: &ProviderConfiguration, local_socket: 
 
       info!("TURN connection established successfully");
 
-      Ok(turn.conn)
+      Ok(Arc::new(turn.conn) as Arc<dyn Conn + Send + Sync>)
     }
   }
 }

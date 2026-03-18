@@ -62,7 +62,7 @@ pub fn init_config() -> Result<AppConfiguration> {
 fn apply_provider_defaults(provider: &mut ProviderConfiguration) {
   if provider.threads.is_none() {
     provider.threads = match &provider.details {
-      ProviderDetails::Default { kind: DefaultProvider::VKCalls, .. } => Some(16),
+      ProviderDetails::Default { kind: DefaultProvider::VkCalls, .. } => Some(16),
       ProviderDetails::Direct => None,
       _ => Some(1),
     };

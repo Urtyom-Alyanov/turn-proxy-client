@@ -4,11 +4,11 @@ use serde::Deserialize;
 #[serde(rename_all = "snake_case")]
 pub enum DefaultProvider {
   #[default]
-  VKCalls,
+  VkCalls,
   YandexTelemost,
 }
 
-#[derive(Deserialize, Debug, Default)]
+#[derive(Deserialize, Debug, Default, Clone)]
 #[serde(tag = "provider", rename_all = "snake_case")]
 pub enum ProviderDetails {
   #[default]
@@ -34,7 +34,7 @@ pub struct CommonConfiguration {
   pub peer_addr: String,
 }
 
-#[derive(Deserialize, Debug, Default)]
+#[derive(Deserialize, Debug, Default, Clone)]
 pub struct ProviderConfiguration {
   /// Приоритет, если не задан то Direct -> Custom -> VK Calls -> Yandex.Telemost
   pub priority: Option<u32>,

@@ -46,8 +46,8 @@ static YANDEX_CAPABILITIES_OFFER: LazyLock<serde_json::Value> = LazyLock::new(||
   "svcModes": ["FALSE"], "reportTelemetryModes": ["TRUE"], "keepDefaultDevicesModes": ["TRUE"]
 }));
 
-pub fn get_yandex_call_id_from_link(link: &str) -> &str {
-  link.trim().split("j/").last()?
+pub fn get_yandex_call_id_from_link(link: &str) -> Result<&str> {
+  Ok(link.trim().split("j/").last().ok_or(anyhow!("Invalid link"))?)
 }
 
 pub async fn get_yandex_telebridge_turn_credentials(call_id: &str, with_name: Option<String>) -> Result<TurnCredentials> {

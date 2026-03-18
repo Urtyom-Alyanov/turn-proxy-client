@@ -8,13 +8,14 @@ use crate::configuration::init_configuration::init_config;
 use crate::logging::init_logger;
 
 use anyhow::Result;
-use tracing::info;
+use crate::proxy_process::listening::listening;
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<()> {
   let _guard = init_logger();
   let config = init_config()?;
 
-  info!("Hello, world!");
+  listening(config).await?;
+
   Ok(())
 }

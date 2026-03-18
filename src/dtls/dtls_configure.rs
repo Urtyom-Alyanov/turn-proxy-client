@@ -1,10 +1,13 @@
+use std::sync::Arc;
 use anyhow::Result;
 use rcgen::{CertificateParams, KeyPair, PKCS_ECDSA_P256_SHA256};
-use tracing::error;
+use tracing::{error, info};
 use dtls::cipher_suite::CipherSuiteId;
 use dtls::config::{Config as DtlsConfig, ExtendedMasterSecretType};
+use dtls::conn::DTLSConn;
+use webrtc_util::Conn;
 
-async fn dtls_configure() -> Result<DtlsConfig> {
+pub async fn dtls_configure(conn: Arc<dyn Conn + Send + Sync>) -> Result<Arc<dyn Conn + Send + Sync>> {
   let key_pair = KeyPair::generate_for(&PKCS_ECDSA_P256_SHA256)?;
   let params = CertificateParams::default();
   let cert = params.self_signed(&key_pair)?;
@@ -23,5 +26,9 @@ async fn dtls_configure() -> Result<DtlsConfig> {
     ..Default::default()
   };
 
-  Ok(config)
+  let dtls_conn = DTLSConn::new(conn, config, true, None).await?;
+
+  info!("DTLS Handshake completed successfully");
+
+  Ok(Arc::new(dtls_conn) as Arc<dyn Conn + Send + Sync>)
 }

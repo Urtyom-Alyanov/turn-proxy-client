@@ -19,8 +19,8 @@ const OKCDN_APPLICATION_KEY: &str = "CGMMEJLGDIHBABABA";
 const VK_REALM: &str = "vk";
 const VK_API_VERSION: &str = "5.264";
 
-pub fn get_vk_call_id_from_link(link: &str) -> &str {
-  link.trim().split("join/").last()?
+pub fn get_vk_call_id_from_link(link: &str) -> Result<&str> {
+  Ok(link.trim().split("join/").last().ok_or(anyhow!("Invalid link"))?)
 }
 
 /// Входит в звонок VK с анонимной учётной записью
