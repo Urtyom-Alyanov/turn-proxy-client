@@ -4,7 +4,7 @@ After=network.target
 Documentation=https://github.com/Urtyom-Alyanov/turn-proxy-proxy
 
 [Service]
-ExecStart=/usr/local/bin/turn-proxy-client --config /etc/turn-proxy/server/config.toml
+ExecStart=/usr/bin/turn-proxy-client --config /etc/turn-proxy/server/config.toml
 
 Restart=always
 RestartSec=5
