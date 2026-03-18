@@ -10,16 +10,13 @@ const DEFAULT_CONFIG_PATH: &str = "/etc/turn-proxy/client/config.toml";
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 pub struct Args {
-  #[arg(long, default_value = DEFAULT_CONFIG_PATH, help = "Путь к конфигурации")]
+  #[arg(long, short, default_value = DEFAULT_CONFIG_PATH, help = "Путь к конфигурации")]
   pub config: String,
 
-  #[arg(long, help = "Не использовать конфигурационный файл")]
-  pub no_config: bool,
-
-  #[arg(long, help = "Слушать выходной адрес")]
+  #[arg(long, short = 'L', help = "Слушать выходной адрес")]
   pub listening_on: Option<String>,
 
-  #[arg(long, help = "Адрес назначения")]
+  #[arg(long, short = 'P', help = "Адрес назначения")]
   pub peer_addr: Option<String>,
 
   #[command(flatten)]
@@ -39,13 +36,13 @@ pub struct ProviderCliArgs {
   ///
   /// Не рекомендуется указывать большие значения, однако может существенно увеличить скорость, если
   /// со стороны поставщика имеется ограничение по скорости для участника конференции.
-  #[arg(long, help = "Количество потоков (участников в звонке), игнорируется при direct")]
+  #[arg(long, short = 'n', help = "Количество потоков (участников в звонке), игнорируется при direct")]
   pub threads: Option<u32>,
 
-  #[arg(long, default_value_t = true, help = "Использовать UDP")]
+  #[arg(long, short = 'U', default_value_t = true, help = "Использовать UDP")]
   pub using_udp: bool,
 
-  #[arg(long, default_value_t = true, help = "Использовать DTLS обфускацию, не рекомендуется отключать \
+  #[arg(long, short = 'D', default_value_t = true, help = "Использовать DTLS обфускацию, не рекомендуется отключать \
     при использовании TURN-сервера")]
   pub using_dtls_obfuscation: bool,
 }
@@ -54,21 +51,22 @@ pub struct ProviderCliArgs {
 pub enum ProviderType {
   Direct,
   Default {
-    #[arg(long, help = "Выбранный провайдер")]
+    #[arg(long = "provider", short='p', help = "Выбранный провайдер")]
     kind: DefaultProvider, // Доступные провайдеры
-    #[arg(long, help = "Ссылка на звонок/конференцию")]
+    #[arg(long, short = 'l', help = "Ссылка на звонок/конференцию")]
     link: String,
   },
   Custom {
-    #[arg(long, help = "Имя пользователя для TURN")]
+    #[arg(long, short = 'u', help = "Имя пользователя для TURN")]
     username: String,
-    #[arg(long, help = "Пароль для TURN")]
+    #[arg(long, short = 'p', help = "Пароль для TURN")]
     password: String,
-    #[arg(long, help = "Адрес TURN-сервера")]
+    #[arg(long, short = 't', help = "Адрес TURN-сервера")]
     turn_address: String,
-    #[arg(long, help = "Адрес STUN-сервера")]
+    #[arg(long, short = 's', help = "Адрес STUN-сервера")]
     stun_address: String,
-    #[arg(long, help = "Realm конференции")]
+    #[arg(long, short = 'r', help = "Realm конференции")]
     realm: String,
   },
+  FromConfigFile
 }
