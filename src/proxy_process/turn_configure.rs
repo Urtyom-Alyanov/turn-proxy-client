@@ -14,7 +14,7 @@ pub struct TurnCredentials {
 }
 
 pub struct TurnConnection<C: Conn> {
-  client: TurnClient,
+  _client: TurnClient,
   pub conn: C
 }
 
@@ -34,7 +34,9 @@ pub async fn turn_configure(
     password: credentials.password,
     realm: credentials.realm,
     conn: turn_sock,
-    ..Default::default()
+    rto_in_ms: 100,
+    vnet: None,
+    software: String::new()
   };
 
   let client = TurnClient::new(client_config).await?;
@@ -48,7 +50,7 @@ pub async fn turn_configure(
   info!("Relay connection at {} allocated!", relay_conn.local_addr()?);
 
   Ok(TurnConnection {
-    client,
+    _client: client,
     conn: relay_conn
   })
 }
