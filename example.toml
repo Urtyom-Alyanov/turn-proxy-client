@@ -1,12 +1,12 @@
 [common]
-listening_on = "0.0.0.0:51820"
-peer_addr = "95.85.245.95:56000"
+listening_on = "127.0.0.1:51821"
+peer_addr = "95.85.145.95:56040"
 
 [[providers]]
 priority = 1
 using_udp = true
 using_dtls_obfuscation = true
-threads = 16
+threads = 1
 
 [providers.details]
 provider = "default"

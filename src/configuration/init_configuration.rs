@@ -6,6 +6,9 @@ use clap::Parser;
 use anyhow::{Context, Result};
 
 pub fn init_config() -> Result<AppConfiguration> {
+  rustls::crypto::ring::default_provider().install_default()
+    .expect("Failed to install rustls crypto provider");
+  
   let args = Args::parse();
 
   let mut config = if fs::metadata(&args.config).is_ok() {

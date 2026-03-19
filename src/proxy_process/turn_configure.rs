@@ -1,45 +1,41 @@
 use anyhow::Result;
 use std::sync::Arc;
-use tokio::net::UdpSocket;
 use tracing::{debug, info};
-use turn::client::{ClientConfig as TurnClientConfig, Client as TurnClient};
+use turn::client::{Client as StunClient, ClientConfig as TurnClientConfig};
 use webrtc_util::Conn;
+
+use crate::proxy_process::turn_connection::TurnConn;
 
 pub struct TurnCredentials {
   pub username: String,
   pub password: String,
   pub realm: String,
   pub turn_addr: String,
-  pub stun_addr: Option<String>
-}
-
-pub struct TurnConnection<C: Conn> {
-  _client: TurnClient,
-  pub conn: C
+  pub stun_addr: Option<String>,
 }
 
 /// Настройка подключения к TURN-серверу с полученными учётными данными от поставщика
 pub async fn turn_configure(
+  secure_conn: Arc<dyn Conn + Send + Sync>,
   credentials: TurnCredentials,
-) -> Result<TurnConnection<impl Conn>> {
-  let turn_sock = Arc::new(UdpSocket::bind("0.0.0.0:0").await?);
-  debug!("Socket {} initialised successfully", turn_sock.local_addr()?);
-
+) -> Result<Arc<TurnConn>> {
   debug!("Setting up connection with {}...", &credentials.turn_addr);
 
   let client_config = TurnClientConfig {
-    stun_serv_addr: credentials.stun_addr.unwrap_or(credentials.turn_addr.clone()),
+    stun_serv_addr: credentials
+      .stun_addr
+      .unwrap_or(credentials.turn_addr.clone()),
     turn_serv_addr: credentials.turn_addr,
     username: credentials.username,
     password: credentials.password,
     realm: credentials.realm,
-    conn: turn_sock,
+    conn: secure_conn,
     rto_in_ms: 100,
     vnet: None,
-    software: String::new()
+    software: String::new(),
   };
 
-  let client = TurnClient::new(client_config).await?;
+  let client = StunClient::new(client_config).await?;
 
   client.listen().await?;
 
@@ -47,10 +43,13 @@ pub async fn turn_configure(
 
   let relay_conn = client.allocate().await?;
 
-  info!("Relay connection at {} allocated!", relay_conn.local_addr()?);
+  info!(
+    "Relay connection at {} allocated!",
+    relay_conn.local_addr()?
+  );
 
-  Ok(TurnConnection {
-    _client: client,
-    conn: relay_conn
-  })
+  Ok(Arc::new(TurnConn {
+    client: client,
+    relay: Arc::new(relay_conn) as Arc<dyn Conn + Sync + Send>,
+  }))
 }

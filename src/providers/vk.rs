@@ -1,10 +1,10 @@
-use crate::proxy_process::turn_configure::TurnCredentials;
 use crate::providers::USER_AGENT;
+use crate::proxy_process::turn_configure::TurnCredentials;
 
-use std::collections::HashMap;
-use anyhow::{anyhow, Context, Result, Ok};
+use anyhow::{Context, Ok, Result, anyhow};
 use reqwest::Client;
 use serde_json::Value;
+use std::collections::HashMap;
 use tracing::info;
 use uuid::Uuid;
 
@@ -20,15 +20,21 @@ const VK_REALM: &str = "vk";
 const VK_API_VERSION: &str = "5.264";
 
 pub fn get_vk_call_id_from_link(link: &str) -> Result<&str> {
-  Ok(link.trim().split("join/").last().ok_or(anyhow!("Invalid link"))?)
+  Ok(
+    link
+      .trim()
+      .split("join/")
+      .last()
+      .ok_or(anyhow!("Invalid link"))?,
+  )
 }
 
 /// Входит в звонок VK с анонимной учётной записью
-pub async fn get_vk_calls_turn_credentials(call_id: String, with_name: Option<String>)
-  -> Result<TurnCredentials> {
-  let client = Client::builder()
-    .user_agent(USER_AGENT)
-    .build()?;
+pub async fn get_vk_calls_turn_credentials(
+  call_id: String,
+  with_name: Option<String>,
+) -> Result<TurnCredentials> {
+  let client = Client::builder().user_agent(USER_AGENT).build()?;
 
   let anonymous = CallTokenCredentials {
     call_id: call_id.clone(),
@@ -52,7 +58,6 @@ pub async fn get_vk_calls_turn_credentials(call_id: String, with_name: Option<St
   Ok(join_into_video_conversation(&client, call_id, call_token, okcdn_token).await?)
 }
 
-
 /// Позволяет получить анонимный токен пользователя ВКонтакте. Есть два разных случая:
 ///
 /// 1. Без `call_payload`, получает стандартный токен.
@@ -64,7 +69,7 @@ async fn get_anonymous_token(client: &Client, call_payload: Option<String>) -> R
     ("client_id".to_owned(), VK_CLIENT_ID.to_owned()),
     ("client_secret".to_owned(), VK_CLIENT_SECRET.to_owned()),
     ("app_id".to_owned(), VK_CLIENT_ID.to_owned()),
-    ("version".to_owned(), "1".to_owned())
+    ("version".to_owned(), "1".to_owned()),
   ]);
 
   if let Some(payload) = call_payload {
@@ -73,25 +78,24 @@ async fn get_anonymous_token(client: &Client, call_payload: Option<String>) -> R
   } else {
     body.insert(
       "scopes".to_owned(),
-      "audio_anonymous,video_anonymous,photos_anonymous,profile_anonymous".to_owned()
+      "audio_anonymous,video_anonymous,photos_anonymous,profile_anonymous".to_owned(),
     );
-    body.insert(
-      "isApiOauthAnonymEnabled".to_owned(),
-      "false".to_owned()
-    );
+    body.insert("isApiOauthAnonymEnabled".to_owned(), "false".to_owned());
   }
 
   info!("Getting VK anonym token...");
   info!("With this payload: {:?}", body);
 
-  let resp = client.post(url)
+  let resp = client
+    .post(url)
     .form(&body)
     .send()
     .await?
     .json::<Value>()
     .await?;
 
-  let token = resp["data"]["access_token"].as_str()
+  let token = resp["data"]["access_token"]
+    .as_str()
     .ok_or_else(|| anyhow!("Failed to get anonym token from response"))?;
 
   Ok(token.to_owned())
@@ -109,16 +113,29 @@ async fn get_call_payload(client: &Client, access_token: String) -> Result<Strin
     ("access_token", access_token),
   ];
 
-  let resp = client.post(url).form(&body).send().await?.json::<Value>().await?;
+  let resp = client
+    .post(url)
+    .form(&body)
+    .send()
+    .await?
+    .json::<Value>()
+    .await?;
 
-  Ok(resp["response"]["payload"].as_str()
-    .ok_or_else(|| anyhow!("Failed to get call payload from response"))?.to_owned())
+  Ok(
+    resp["response"]["payload"]
+      .as_str()
+      .ok_or_else(|| anyhow!("Failed to get call payload from response"))?
+      .to_owned(),
+  )
 }
 
 /// Позволяет получить ключ для подключения к звонку (`call_token`)
-async fn get_call_token(client: &Client, access_token: String, credentials: CallTokenCredentials)
-  -> Result<String> {
-  let url = "https://api.vk.ru/method/calls.getAnonymousAccessTokenPayload";
+async fn get_call_token(
+  client: &Client,
+  access_token: String,
+  credentials: CallTokenCredentials,
+) -> Result<String> {
+  let url = "https://api.vk.ru/method/calls.getAnonymousToken";
 
   info!("Getting call token for {}...", &credentials.call_id);
   let join_link = format!("https://vk.com/call/join/{}", credentials.call_id);
@@ -131,12 +148,20 @@ async fn get_call_token(client: &Client, access_token: String, credentials: Call
     ("vk_join_link", join_link),
   ]);
 
-  let resp = client.post(url)
+  let resp = client
+    .post(url)
     .form(&body)
-    .send().await?.json::<Value>().await?;
+    .send()
+    .await?
+    .json::<Value>()
+    .await?;
 
-  Ok(resp["response"]["token"].as_str()
-    .ok_or_else(|| anyhow!("Failed to get call token from response"))?.to_owned())
+  Ok(
+    resp["response"]["token"]
+      .as_str()
+      .ok_or_else(|| anyhow!("Failed to get call token from response"))?
+      .to_owned(),
+  )
 }
 
 /// Получает OKCDN токен для звонка
@@ -144,7 +169,10 @@ async fn get_okcdn_anonymous_token(client: &Client) -> Result<String> {
   let url = "https://calls.okcdn.ru/fb.do";
   let device_id = Uuid::new_v4();
 
-  info!("Getting OKCDN token for device {}...", &device_id.to_string());
+  info!(
+    "Getting OKCDN token for device {}...",
+    &device_id.to_string()
+  );
 
   let session_data = format!(
     "{{\"version\":2,\"device_id\":\"{}\",\"client_version\":1.1,\"client_type\":\"SDK_JS\"}}",
@@ -155,13 +183,23 @@ async fn get_okcdn_anonymous_token(client: &Client) -> Result<String> {
     ("method", "auth.anonymLogin".to_owned()),
     ("session_data", session_data),
     ("format", "JSON".to_owned()),
-    ("application_key", OKCDN_APPLICATION_KEY.to_owned())
+    ("application_key", OKCDN_APPLICATION_KEY.to_owned()),
   ]);
 
-  let resp = client.post(url).form(&body).send().await?.json::<Value>().await?;
+  let resp = client
+    .post(url)
+    .form(&body)
+    .send()
+    .await?
+    .json::<Value>()
+    .await?;
 
-  Ok(resp["session_key"].as_str().ok_or(anyhow!("Failed to get okcdn_token from response"))?
-      .to_owned())
+  Ok(
+    resp["session_key"]
+      .as_str()
+      .ok_or(anyhow!("Failed to get okcdn_token from response"))?
+      .to_owned(),
+  )
 }
 
 /// Входит в видео конференцию ВКонтакте, получая тем самым учётные данные для TURN-сервера
@@ -169,7 +207,7 @@ async fn join_into_video_conversation(
   client: &Client,
   call_id: String,
   call_token: String,
-  okcdn_token: String
+  okcdn_token: String,
 ) -> Result<TurnCredentials> {
   let url = "https://calls.okcdn.ru/fb.do";
 
@@ -186,15 +224,21 @@ async fn join_into_video_conversation(
     ("session_key", okcdn_token),
   ]);
 
-  let resp = client.post(url)
+  let resp = client
+    .post(url)
     .form(&body)
-    .send().await?.json::<Value>().await?;
+    .send()
+    .await?
+    .json::<Value>()
+    .await?;
 
   info!("Joined successfully. Getting TURN server");
 
   let turn_data = &resp["turn_server"];
 
-  let turn_url = turn_data["urls"][0].as_str().context("No turn URL provided")?;
+  let turn_url = turn_data["urls"][0]
+    .as_str()
+    .context("No turn URL provided")?;
 
   let turn_addr = turn_url
     .trim_start_matches("turn:")
@@ -205,11 +249,15 @@ async fn join_into_video_conversation(
     .to_owned();
 
   Ok(TurnCredentials {
-    username: turn_data["username"].as_str()
-      .context("`username` does not contained in received data")?.to_owned(),
+    username: turn_data["username"]
+      .as_str()
+      .context("`username` does not contained in received data")?
+      .to_owned(),
     realm: VK_REALM.to_owned(),
-    password: turn_data["credential"].as_str()
-      .context("`credential` (TURN password) does not contained in received data")?.to_string(),
+    password: turn_data["credential"]
+      .as_str()
+      .context("`credential` (TURN password) does not contained in received data")?
+      .to_string(),
     stun_addr: turn_addr.clone().into(),
     turn_addr,
   })
