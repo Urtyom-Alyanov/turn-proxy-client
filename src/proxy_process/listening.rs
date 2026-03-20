@@ -11,6 +11,7 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::net::UdpSocket;
+use tokio::sync::RwLock;
 use tokio_util::sync::CancellationToken;
 use tracing::{error, info, warn};
 use webrtc_util::Conn;
@@ -55,7 +56,7 @@ pub async fn listening(config: AppConfiguration) -> Result<()> {
 
       let base_conn = Arc::new(outbound) as Arc<dyn Conn + Send + Sync>;
 
-      let remote_conn = match setup_and_run_provider(provider, base_conn).await {
+      let remote_conn = match setup_and_run_provider(provider, base_conn, peer_addr).await {
         Ok(conn) => conn,
         Err(e) => {
           warn!("Failed to setup provider: {}. Trying next...", e);

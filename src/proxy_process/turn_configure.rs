@@ -49,7 +49,7 @@ pub async fn turn_configure(
   );
 
   Ok(Arc::new(TurnConn {
-    client: client,
+    client,
     relay: Arc::new(relay_conn) as Arc<dyn Conn + Sync + Send>,
   }))
 }

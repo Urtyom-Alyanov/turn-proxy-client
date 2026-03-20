@@ -34,10 +34,10 @@ pub async fn dtls_configure(
     extended_master_secret: ExtendedMasterSecretType::Request,
     cipher_suites: vec![CipherSuiteId::Tls_Ecdhe_Ecdsa_With_Aes_128_Gcm_Sha256],
     insecure_skip_verify: true,
-    server_name: String::new(),
-    flight_interval: FLIGHT_INTERVAL,
-    mtu: 1200,
-    replay_protection_window: 1024,
+    // server_name: String::new(),
+    // flight_interval: FLIGHT_INTERVAL,
+    // mtu: 1200,
+    // replay_protection_window: 1024,
 
     ..Default::default()
   };
@@ -53,7 +53,7 @@ async fn process_handshake(
   config: DtlsConfig,
 ) -> Result<DTLSConn> {
   let handshake_fut = DTLSConn::new(conn, config, true, None);
-
+  
   match timeout(HANDSHAKE_TIMEOUT, handshake_fut).await {
     Ok(Ok(dtls_conn)) => {
       info!("DTLS Handshake completed successfully");

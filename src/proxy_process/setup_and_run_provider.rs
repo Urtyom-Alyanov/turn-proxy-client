@@ -1,7 +1,7 @@
 use anyhow::{Result, anyhow};
 use std::{net::SocketAddr, sync::Arc};
-use tracing::info;
-
+use std::time::Duration;
+use tracing::{debug, info, warn};
 use webrtc_util::Conn;
 
 use crate::{
@@ -16,11 +16,12 @@ use crate::{
 pub async fn setup_and_run_provider(
   provider: &ProviderConfiguration,
   connection: Arc<dyn Conn + Send + Sync>,
+  peer_addr: SocketAddr,
 ) -> Result<Arc<dyn Conn + Send + Sync>> {
   match &provider.details {
     ProviderDetails::Direct => {
       info!("Try to direct connection with server...");
-      // connection.connect(peer_addr).await?;
+      connection.connect(peer_addr).await?;
       Ok(connection)
     }
     _ => {
@@ -30,6 +31,16 @@ pub async fn setup_and_run_provider(
       let turn = turn_configure(connection, creds).await?;
 
       info!("TURN connection established successfully");
+      info!("Warming up TURN channel to {}...", peer_addr);
+
+      match turn.send_to(b"ping", peer_addr).await {
+        Ok(_) => debug!("Send_to called"),
+        Err(e) => warn!("Send_to error: {}", e),
+      };
+      tokio::time::sleep(Duration::from_millis(200)).await;
+
+
+      info!("Connection established successfully");
 
       Ok(turn as Arc<dyn Conn + Send + Sync>)
     }
