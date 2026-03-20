@@ -60,7 +60,7 @@ pub struct ProviderConfiguration {
   ///
   /// Не рекомендуется указывать большие значения, однако может существенно увеличить скорость, если
   /// со стороны поставщика имеется ограничение по скорости для участника конференции.
-  pub threads: Option<i32>,
+  pub threads: Option<usize>,
 }
 
 #[derive(Deserialize, Debug, Default)]

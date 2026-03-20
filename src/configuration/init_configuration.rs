@@ -50,7 +50,7 @@ pub fn init_config() -> Result<AppConfiguration> {
         using_udp: common.using_udp,
         using_dtls_obfuscation: common.using_dtls_obfuscation,
         details,
-        threads: common.threads.map(|t| t as i32),
+        threads: common.threads.map(|t| t as usize),
       }];
     }
   }

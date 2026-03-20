@@ -12,9 +12,7 @@ use webrtc_util::Conn;
 const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(10);
 const FLIGHT_INTERVAL: Duration = Duration::from_millis(2000);
 
-pub async fn dtls_configure(
-  conn: Arc<dyn Conn + Send + Sync>,
-) -> Result<Arc<dyn Conn + Send + Sync>> {
+pub fn dtls_configure() -> Result<DtlsConfig> {
   let key_pair = KeyPair::generate_for(&PKCS_ECDSA_P256_SHA256)?;
   info!("Key pair for certificate generated");
 
@@ -43,26 +41,26 @@ pub async fn dtls_configure(
   };
   info!("DTLS configured");
 
-  let dtls_conn = process_handshake(conn, config).await?;
-
-  Ok(Arc::new(dtls_conn) as Arc<dyn Conn + Send + Sync>)
+  Ok(config)
 }
 
-async fn process_handshake(
+pub async fn dtls_process_handshake(
+  thread_name: &str,
   conn: Arc<dyn Conn + Send + Sync>,
   config: DtlsConfig,
-) -> Result<DTLSConn> {
+) -> Result<Arc<DTLSConn>> {
   let handshake_fut = DTLSConn::new(conn, config, true, None);
   
   match timeout(HANDSHAKE_TIMEOUT, handshake_fut).await {
     Ok(Ok(dtls_conn)) => {
-      info!("DTLS Handshake completed successfully");
-      Ok(dtls_conn)
+      info!("[{}] DTLS Handshake completed successfully", thread_name);
+      Ok(Arc::new(dtls_conn))
     }
-    Ok(Err(e)) => Err(anyhow!("DTLS handshake failed: {}", e)),
+    Ok(Err(e)) => Err(anyhow!("[{}] DTLS handshake failed: {}, thread_name", thread_name, e)),
     Err(_) => Err(anyhow!(
-      "DTLS handshake timed out after 10s - \
-               server is not responding or TURN relay is not forwarding"
+      "[{}] DTLS handshake timed out after 10s - \
+      server is not responding or TURN relay is not forwarding",
+      thread_name
     )),
   }
 }

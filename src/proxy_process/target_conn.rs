@@ -4,6 +4,9 @@ use std::net::SocketAddr;
 use std::sync::{Arc};
 use webrtc_util::{Conn, Result};
 
+/// Высокоуровневая абстракция для TURN-соединения (при `send` отправляет на `remote_addr`),
+/// но также может быть использована и с обычным UDP-соединением (прямым, то бишь). Используется при
+/// DTLS-рукопожатии (он использует `send` и `recv`)
 pub struct TargetedConn {
   pub inner: Arc<dyn Conn + Send + Sync>,
   pub remote_addr: SocketAddr,

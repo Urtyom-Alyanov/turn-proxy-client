@@ -1,22 +1,24 @@
-use crate::dtls::dtls_configure::dtls_configure;
-use crate::proxy_process::run_bridge_group::run_bridge_group;
+use crate::dtls::dtls_configure::{dtls_process_handshake};
+use crate::proxy_process::run_bridge_group::{run_bridge_thread};
 use crate::proxy_process::target_conn::TargetedConn;
 use crate::{
   configuration::configuration::AppConfiguration,
   proxy_process::setup_and_run_provider::setup_and_run_provider,
 };
+use crate::configuration::configuration::ProviderConfiguration;
 
 use anyhow::{Context, Result};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::net::UdpSocket;
-use tokio::sync::RwLock;
+use tokio::task::JoinSet;
 use tokio_util::sync::CancellationToken;
 use tracing::{error, info, warn};
 use webrtc_util::Conn;
+use dtls::config::{Config as DtlsConfig};
 
-pub async fn listening(config: AppConfiguration) -> Result<()> {
+pub async fn listening(config: AppConfiguration, dtls_config: DtlsConfig) -> Result<()> {
   let listen_addr: SocketAddr = config
     .common
     .listening_on
@@ -47,56 +49,65 @@ pub async fn listening(config: AppConfiguration) -> Result<()> {
   providers.sort_by_key(|p| p.priority.unwrap_or(u32::MAX));
 
   loop {
-    let mut provider_active = false;
+    if cancel_token.is_cancelled() { break; }
 
     for provider in &providers {
-      info!("Trying provider with priority {:?}", provider.priority);
+      info!("Trying provider with priority {:?}", provider.priority.unwrap_or(1));
 
-      let outbound = UdpSocket::bind("0.0.0.0:0").await?;
+      let thread_count = provider.threads.unwrap_or(1);
+      let mut handles = JoinSet::new();
 
-      let base_conn = Arc::new(outbound) as Arc<dyn Conn + Send + Sync>;
+      for thread_id in 0..thread_count {
+        let p_clone = provider.clone();
+        let l_clone = listen_socket.clone();
+        let p_addr = peer_addr;
+        let t_token = cancel_token.child_token();
+        let dtls_cert_copy = dtls_config.clone();
 
-      let remote_conn = match setup_and_run_provider(provider, base_conn, peer_addr).await {
-        Ok(conn) => conn,
-        Err(e) => {
-          warn!("Failed to setup provider: {}. Trying next...", e);
-          continue;
+
+        handles.spawn(async move {
+          let conn = setup_connection(
+            format!("P{}T{}", p_clone.priority.unwrap_or(1),
+                    thread_id).as_str(),
+            &p_clone,
+            p_addr,
+            dtls_cert_copy
+          ).await?;
+
+          run_bridge_thread(
+            &p_clone,
+            thread_id,
+            l_clone,
+            conn,
+            t_token
+          ).await
+        });
+      }
+
+      let should_try_next = tokio::select! {
+        _ = cancel_token.cancelled() => {
+          info!("Terminating all threads...");
+          false
+        }
+        Some(res) = handles.join_next() => {
+          match res {
+            Ok(Ok(_)) => warn!("A thread finished successfully. Switching provider..."),
+            Ok(Err(e)) => error!("Thread error: {}. Switching...", e),
+            Err(e) => error!("Thread panicked: {}", e),
+          }
+          true
         }
       };
 
-      let targeted_conn = Arc::new(TargetedConn {
-        inner: remote_conn,
-        remote_addr: peer_addr,
-      });
+      handles.shutdown().await;
 
-      let secure_conn = if provider.using_dtls_obfuscation {
-        dtls_configure(targeted_conn)
-          .await
-          .context("Failed to configure DTLS connection")?
-      } else {
-        targeted_conn
-      };
-
-      let provider_token = cancel_token.child_token();
-      if let Err(e) = run_bridge_group(
-        provider,
-        listen_socket.clone(),
-        secure_conn,
-        peer_addr,
-        provider_token,
-      )
-      .await
-      {
-        error!("Bridge failed: {}. Switching to next provider...", e);
-        continue;
+      if !should_try_next || cancel_token.is_cancelled() {
+        break;
       }
-
-      provider_active = true;
-      break;
     }
 
-    if !provider_active && !cancel_token.is_cancelled() {
-      error!("Not available providers. Retry after 5 seconds...");
+    if !cancel_token.is_cancelled() {
+      warn!("All providers failed or finished. Retrying in 5s...");
       tokio::select! {
         _ = cancel_token.cancelled() => break,
         _ = tokio::time::sleep(Duration::from_secs(5)) => {}
@@ -104,5 +115,34 @@ pub async fn listening(config: AppConfiguration) -> Result<()> {
     }
   }
 
+  info!("Terminating...");
+  // let _ = tokio::time::timeout(Duration::from_secs(3), async {
+  //   while let Some(_) = cancel_set.join_next().await {}
+  // }).await;
+
   Ok(())
+}
+
+
+async fn setup_connection(thread_id: &str, provider: &ProviderConfiguration, peer_addr: SocketAddr, dtls_config: DtlsConfig) -> Result<Arc<dyn Conn + Send + Sync>> {
+  let outbound = UdpSocket::bind("0.0.0.0:0").await?;
+
+  let base_conn = Arc::new(outbound) as Arc<dyn Conn + Send + Sync>;
+
+  let remote_conn = setup_and_run_provider(provider, base_conn, peer_addr).await?;
+
+  let targeted_conn = Arc::new(TargetedConn {
+    inner: remote_conn,
+    remote_addr: peer_addr,
+  });
+
+  let secure_conn: Arc<dyn Conn + Sync + Send> = if provider.using_dtls_obfuscation {
+    dtls_process_handshake(thread_id, targeted_conn, dtls_config)
+      .await
+      .context("Failed to configure DTLS connection")?
+  } else {
+    targeted_conn
+  };
+
+  Ok(secure_conn)
 }
