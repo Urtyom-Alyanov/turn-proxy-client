@@ -1,6 +1,7 @@
 use anyhow::Result;
 use std::net::SocketAddr;
 use std::sync::Arc;
+use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, warn};
@@ -9,13 +10,15 @@ use webrtc_util::Conn;
 pub struct ProxyBridge {
   pub flow_name: String,
   pub cancellation_token: CancellationToken,
+  client_addr_cache: Arc<RwLock<Option<SocketAddr>>>
 }
 
 impl ProxyBridge {
-  pub fn new(flow_name: String, cancellation_token: CancellationToken) -> Self {
+  pub fn new(flow_name: String, cancellation_token: CancellationToken, dest: Option<SocketAddr>) -> Self {
     Self {
       flow_name,
       cancellation_token,
+      client_addr_cache: Arc::new(RwLock::new(dest))
     }
   }
 
@@ -38,6 +41,9 @@ impl ProxyBridge {
 
       local_conn,
       remote_conn,
+
+      Some(self.client_addr_cache.clone()),
+      None
     ))
   }
 
@@ -60,6 +66,9 @@ impl ProxyBridge {
 
       remote_conn,
       local_conn,
+
+      None,
+      Some(self.client_addr_cache.clone())
     ))
   }
 }
@@ -73,19 +82,29 @@ pub fn proxy_flow(
   to_addr: SocketAddr,
 
   from_flow: Arc<dyn Conn + Send + Sync>,
-  to_flow: Arc<dyn Conn + Send + Sync>
+  to_flow: Arc<dyn Conn + Send + Sync>,
+
+  from_cache: Option<Arc<RwLock<Option<SocketAddr>>>>,
+  to_cache: Option<Arc<RwLock<Option<SocketAddr>>>>,
 ) -> JoinHandle<Result<()>> {
   tokio::spawn(async move {
     let mut buf = [0u8; 2048];
 
     loop {
-      match from_flow.recv(&mut buf).await {
-        Ok(n) if n > 0 => {
+      match from_flow.recv_from(&mut buf).await {
+        Ok((n, src_addr)) if n > 0 => {
           debug!("[{}] Received {} bytes from {}", flow_name, n, from_addr);
+          if let Some(from_cache) = &from_cache {
+            from_cache.write().await.replace(src_addr);
+          }
           if n >= buf.len() {
             warn!("[{}] Packet from {} is too large for buffer ({})", flow_name, from_addr, n);
           }
-          if let Err(e) = to_flow.send(&buf[..n]).await {
+          let dest = match &to_cache {
+            Some(cache) => cache.read().await.unwrap(),
+            None => to_addr,
+          };
+          if let Err(e) = to_flow.send_to(&buf[..n], dest).await {
             warn!("[{}] Error sending to {} from {}: {}", flow_name, to_addr, from_addr, e);
             break;
           }

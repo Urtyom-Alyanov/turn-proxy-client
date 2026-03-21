@@ -5,26 +5,23 @@ use tokio::{net::UdpSocket, task::JoinHandle};
 use tokio_util::sync::CancellationToken;
 use webrtc_util::Conn;
 
-use crate::{
-  configuration::configuration::ProviderConfiguration, proxy_process::proxy_flow::ProxyBridge,
-};
+use crate::proxy_process::proxy_flow::ProxyBridge;
 use crate::proxy_process::target_conn::TargetedConn;
 
 pub async fn run_bridge_thread(
-  provider: &ProviderConfiguration,
   thread_num: usize,
-  listen_socket: Arc<UdpSocket>,
+  listen_conn: Arc<UdpSocket>,
   remote_conn: Arc<dyn Conn + Send + Sync>,
   token: CancellationToken,
 ) -> Result<()> {
   let mut handles: Vec<JoinHandle<Result<()>>> = vec![];
   let local_conn = Arc::new(TargetedConn {
-    inner: listen_socket.clone(),
-    remote_addr: listen_socket.local_addr()?,
+    inner: listen_conn.clone(),
+    remote_addr: listen_conn.local_addr()?,
   });
 
-  let flow_id = format!("P-{}-T-{}", provider.priority.unwrap_or(0), thread_num);
-  let bridge = ProxyBridge::new(flow_id, token.clone());
+  let thread_id = format!("T{}", thread_num);
+  let bridge = ProxyBridge::new(thread_id, token.clone(), None);
 
   let up = bridge
     .run_upstream(local_conn.clone(), remote_conn.clone())

@@ -75,7 +75,6 @@ pub async fn listening(config: AppConfiguration, dtls_config: DtlsConfig) -> Res
           ).await?;
 
           run_bridge_thread(
-            &p_clone,
             thread_id,
             l_clone,
             conn,
