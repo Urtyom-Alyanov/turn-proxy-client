@@ -32,10 +32,10 @@ pub fn dtls_configure() -> Result<DtlsConfig> {
     extended_master_secret: ExtendedMasterSecretType::Request,
     cipher_suites: vec![CipherSuiteId::Tls_Ecdhe_Ecdsa_With_Aes_128_Gcm_Sha256],
     insecure_skip_verify: true,
-    // server_name: String::new(),
-    // flight_interval: FLIGHT_INTERVAL,
-    // mtu: 1200,
-    // replay_protection_window: 1024,
+    server_name: String::new(),
+    flight_interval: FLIGHT_INTERVAL,
+    mtu: 1280,
+    replay_protection_window: 1024,
 
     ..Default::default()
   };
