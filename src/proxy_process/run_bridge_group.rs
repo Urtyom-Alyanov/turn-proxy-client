@@ -1,7 +1,7 @@
 use anyhow::Result;
 use std::{sync::Arc};
-
 use tokio::{net::UdpSocket, task::JoinHandle};
+use tokio::sync::RwLock;
 use tokio_util::sync::CancellationToken;
 use webrtc_util::Conn;
 
@@ -21,14 +21,22 @@ pub async fn run_bridge_thread(
   });
 
   let thread_id = format!("T{}", thread_num);
-  let bridge = ProxyBridge::new(thread_id, token.clone(), None);
+  let bridge = ProxyBridge::new(
+    thread_id,
+    token.clone(),
+    local_conn,
+    remote_conn,
+    Some(Arc::new(RwLock::new(None)))
+  );
+  
+  let (up, down) = bridge.spawn()?;
 
-  let up = bridge
-    .run_upstream(local_conn.clone(), remote_conn.clone())
-    .await?;
-  let down = bridge
-    .run_downstream(local_conn.clone(), remote_conn.clone())
-    .await?;
+  // let up = bridge
+  //   .run_upstream(local_conn.clone(), remote_conn.clone())
+  //   .await?;
+  // let down = bridge
+  //   .run_downstream(local_conn.clone(), remote_conn.clone())
+  //   .await?;
 
   handles.push(up);
   handles.push(down);
