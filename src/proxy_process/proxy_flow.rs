@@ -7,6 +7,7 @@ use tokio_util::sync::CancellationToken;
 use tracing::{debug, warn};
 use webrtc_util::Conn;
 
+/// Более высокоуровневая структура для прокси-взаимодействия
 pub struct ProxyBridge {
   pub flow_name: String,
   pub cancellation_token: CancellationToken,
