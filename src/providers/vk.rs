@@ -6,7 +6,7 @@ use serde_json::Value;
 use tracing::info;
 use uuid::Uuid;
 
-use crate::{providers::USER_AGENT, proxy_process::turn_configure::TurnCredentials};
+use crate::{inbound::create_inbound_client, proxy_process::turn_configure::TurnCredentials};
 
 struct CallTokenCredentials
 {
@@ -37,7 +37,7 @@ pub async fn get_vk_calls_turn_credentials(
   with_name: Option<String>,
 ) -> Result<TurnCredentials>
 {
-  let client = Client::builder().user_agent(USER_AGENT).build()?;
+  let client = create_inbound_client().await?;
 
   let anonymous = CallTokenCredentials {
     call_id: call_id.clone(),
