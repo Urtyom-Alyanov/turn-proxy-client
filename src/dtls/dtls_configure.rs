@@ -5,6 +5,7 @@ use dtls::{
   cipher_suite::CipherSuiteId,
   config::{Config as DtlsConfig, ExtendedMasterSecretType},
   conn::DTLSConn,
+  crypto::CryptoPrivateKey,
 };
 use rcgen::{CertificateParams, KeyPair, PKCS_ECDSA_P256_SHA256};
 use tokio::time::timeout;
@@ -25,7 +26,7 @@ pub fn dtls_configure() -> Result<DtlsConfig>
 
   let dtls_cert = dtls::crypto::Certificate {
     certificate: vec![cert.der().to_vec().into()],
-    private_key: dtls::crypto::CryptoPrivateKey::from_key_pair(&key_pair)
+    private_key: CryptoPrivateKey::from_key_pair(&key_pair)
       .map_err(|e| error!("DTLS key parsing error: {}", e))
       .unwrap(),
   };

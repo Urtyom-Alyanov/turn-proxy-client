@@ -19,7 +19,7 @@ pub struct TurnCredentials
 /// Настройка подключения к TURN-серверу с полученными учётными данными от
 /// поставщика
 pub async fn turn_configure(
-  secure_conn: Arc<dyn Conn + Send + Sync>,
+  conn: Arc<dyn Conn + Send + Sync>,
   credentials: TurnCredentials,
 ) -> Result<Arc<TurnConn>>
 {
@@ -33,7 +33,7 @@ pub async fn turn_configure(
     username: credentials.username,
     password: credentials.password,
     realm: credentials.realm,
-    conn: secure_conn,
+    conn,
     rto_in_ms: 100,
     vnet: None,
     software: String::new(),

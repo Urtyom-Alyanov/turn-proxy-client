@@ -1,5 +1,6 @@
 pub mod configuration;
 pub mod dtls;
+pub mod inbound;
 pub mod logging;
 pub mod providers;
 pub mod proxy_process;

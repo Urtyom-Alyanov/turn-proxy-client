@@ -13,10 +13,8 @@ use tokio_tungstenite::{
 use uuid::Uuid;
 
 use crate::{
-  providers::{
-    USER_AGENT,
-    yandex::datatypes::{ConferenceResponse, HelloPayload, HelloRequest, WssResponse},
-  },
+  inbound::{USER_AGENT, create_inbound_client},
+  providers::yandex::datatypes::{ConferenceResponse, HelloPayload, HelloRequest, WssResponse},
   proxy_process::turn_configure::TurnCredentials,
 };
 
@@ -70,7 +68,7 @@ pub async fn get_yandex_telebridge_turn_credentials(
   with_name: Option<String>,
 ) -> Result<TurnCredentials>
 {
-  let client = reqwest::Client::new();
+  let client = create_inbound_client().await?;
   let endpoint = format!(
     "https://cloud-api.yandex.ru/telemost_front/v2/telemost/conferences/https%3A%2F%2Ftelemost.yandex.ru%2Fj%2F{}/connection?next_gen_media_platform_allowed=false",
     call_id
