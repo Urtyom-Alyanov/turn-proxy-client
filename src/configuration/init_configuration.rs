@@ -1,14 +1,19 @@
 use std::fs;
-use crate::configuration::args::{Args, ProviderType};
-use crate::configuration::configuration::{AppConfiguration, DefaultProvider, ProviderConfiguration, ProviderDetails};
 
-use clap::Parser;
 use anyhow::{Context, Result};
+use clap::Parser;
 
-pub fn init_config() -> Result<AppConfiguration> {
-  rustls::crypto::ring::default_provider().install_default()
+use crate::configuration::{
+  args::{Args, ProviderType},
+  configuration::{AppConfiguration, DefaultProvider, ProviderConfiguration, ProviderDetails},
+};
+
+pub fn init_config() -> Result<AppConfiguration>
+{
+  rustls::crypto::ring::default_provider()
+    .install_default()
     .expect("Failed to install rustls crypto provider");
-  
+
   let args = Args::parse();
 
   let mut config = if fs::metadata(&args.config).is_ok() {
@@ -18,7 +23,10 @@ pub fn init_config() -> Result<AppConfiguration> {
       .with_context(|| format!("Failed to parse TOML from: {}", args.config))?
   } else {
     if matches!(args.provider_type, Some(ProviderType::FromConfigFile)) {
-      anyhow::bail!("Subcommand 'from-config-file', but file '{}' not founded.", args.config);
+      anyhow::bail!(
+        "Subcommand 'from-config-file', but file '{}' not founded.",
+        args.config
+      );
     }
     AppConfiguration::default()
   };
@@ -29,6 +37,9 @@ pub fn init_config() -> Result<AppConfiguration> {
   if let Some(peer) = args.peer_addr {
     config.common.peer_addr = peer;
   }
+  if let Some(write_addr) = args.write_addr {
+    config.common.write_addr = Some(write_addr);
+  }
 
   if let Some(provider_type) = args.provider_type {
     if !matches!(provider_type, ProviderType::FromConfigFile) {
@@ -37,11 +48,19 @@ pub fn init_config() -> Result<AppConfiguration> {
       let details = match provider_type {
         ProviderType::Direct => ProviderDetails::Direct,
         ProviderType::Default { kind, link } => ProviderDetails::Default { kind, link },
-        ProviderType::Custom { username, password, turn_address, stun_address, realm } => {
-          ProviderDetails::Custom {
-            username, password, turn_address, stun_address, realm,
-          }
-        }
+        ProviderType::Custom {
+          username,
+          password,
+          turn_address,
+          stun_address,
+          realm,
+        } => ProviderDetails::Custom {
+          username,
+          password,
+          turn_address,
+          stun_address,
+          realm,
+        },
         _ => unreachable!(),
       };
 
@@ -62,10 +81,14 @@ pub fn init_config() -> Result<AppConfiguration> {
   Ok(config)
 }
 
-fn apply_provider_defaults(provider: &mut ProviderConfiguration) {
+fn apply_provider_defaults(provider: &mut ProviderConfiguration)
+{
   if provider.threads.is_none() {
     provider.threads = match &provider.details {
-      ProviderDetails::Default { kind: DefaultProvider::VkCalls, .. } => Some(16),
+      ProviderDetails::Default {
+        kind: DefaultProvider::VkCalls,
+        ..
+      } => Some(16),
       ProviderDetails::Direct => None,
       _ => Some(1),
     };

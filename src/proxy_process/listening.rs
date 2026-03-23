@@ -1,24 +1,23 @@
-use crate::dtls::dtls_configure::{dtls_process_handshake};
-use crate::proxy_process::run_bridge_group::{run_bridge_thread};
-use crate::proxy_process::target_conn::TargetedConn;
-use crate::{
-  configuration::configuration::AppConfiguration,
-  proxy_process::setup_and_run_provider::setup_and_run_provider,
-};
-use crate::configuration::configuration::ProviderConfiguration;
+use std::{net::SocketAddr, sync::Arc, time::Duration};
 
 use anyhow::{Context, Result};
-use std::net::SocketAddr;
-use std::sync::Arc;
-use std::time::Duration;
-use tokio::net::UdpSocket;
-use tokio::task::JoinSet;
+use dtls::config::Config as DtlsConfig;
+use tokio::{net::UdpSocket, task::JoinSet};
 use tokio_util::sync::CancellationToken;
 use tracing::{error, info, warn};
 use webrtc_util::Conn;
-use dtls::config::{Config as DtlsConfig};
 
-pub async fn listening(config: AppConfiguration, dtls_config: DtlsConfig) -> Result<()> {
+use crate::{
+  configuration::configuration::{AppConfiguration, ProviderConfiguration},
+  dtls::dtls_configure::dtls_process_handshake,
+  proxy_process::{
+    run_bridge_group::run_bridge_thread, setup_and_run_provider::setup_and_run_provider,
+    target_conn::TargetedConn,
+  },
+};
+
+pub async fn listening(config: AppConfiguration, dtls_config: DtlsConfig) -> Result<()>
+{
   let listen_addr: SocketAddr = config
     .common
     .listening_on
@@ -49,10 +48,15 @@ pub async fn listening(config: AppConfiguration, dtls_config: DtlsConfig) -> Res
   providers.sort_by_key(|p| p.priority.unwrap_or(u32::MAX));
 
   loop {
-    if cancel_token.is_cancelled() { break; }
+    if cancel_token.is_cancelled() {
+      break;
+    }
 
     for provider in &providers {
-      info!("Trying provider with priority {:?}", provider.priority.unwrap_or(1));
+      info!(
+        "Trying provider with priority {:?}",
+        provider.priority.unwrap_or(1)
+      );
 
       let thread_count = provider.threads.unwrap_or(1);
       let mut handles = JoinSet::new();
@@ -63,23 +67,19 @@ pub async fn listening(config: AppConfiguration, dtls_config: DtlsConfig) -> Res
         let p_addr = peer_addr;
         let t_token = cancel_token.child_token();
         let dtls_cert_copy = dtls_config.clone();
-
+        let write_addr = config.common.write_addr.clone();
 
         handles.spawn(async move {
           let conn = setup_connection(
-            format!("P{}T{}", p_clone.priority.unwrap_or(1),
-                    thread_id).as_str(),
+            format!("T{}", thread_id).as_str(),
             &p_clone,
             p_addr,
-            dtls_cert_copy
-          ).await?;
+            dtls_cert_copy,
+            write_addr,
+          )
+          .await?;
 
-          run_bridge_thread(
-            thread_id,
-            l_clone,
-            conn,
-            t_token
-          ).await
+          run_bridge_thread(thread_id, l_clone, conn, t_token).await
         });
       }
 
@@ -122,13 +122,25 @@ pub async fn listening(config: AppConfiguration, dtls_config: DtlsConfig) -> Res
   Ok(())
 }
 
-
-async fn setup_connection(thread_id: &str, provider: &ProviderConfiguration, peer_addr: SocketAddr, dtls_config: DtlsConfig) -> Result<Arc<dyn Conn + Send + Sync>> {
+async fn setup_connection(
+  thread_id: &str,
+  provider: &ProviderConfiguration,
+  peer_addr: SocketAddr,
+  dtls_config: DtlsConfig,
+  write_addr: Option<bool>,
+) -> Result<Arc<dyn Conn + Send + Sync>>
+{
   let outbound = UdpSocket::bind("0.0.0.0:0").await?;
 
   let base_conn = Arc::new(outbound) as Arc<dyn Conn + Send + Sync>;
 
   let remote_conn = setup_and_run_provider(provider, base_conn, peer_addr).await?;
+
+  if let Ok(proxy_addr) = remote_conn.local_addr() {
+    if write_addr.unwrap_or(false) {
+      println!("{}", proxy_addr.ip());
+    }
+  };
 
   let targeted_conn = Arc::new(TargetedConn {
     inner: remote_conn,

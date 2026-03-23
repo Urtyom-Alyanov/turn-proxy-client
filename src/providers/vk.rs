@@ -1,14 +1,15 @@
-use crate::providers::USER_AGENT;
-use crate::proxy_process::turn_configure::TurnCredentials;
+use std::collections::HashMap;
 
 use anyhow::{Context, Ok, Result, anyhow};
 use reqwest::Client;
 use serde_json::Value;
-use std::collections::HashMap;
 use tracing::info;
 use uuid::Uuid;
 
-struct CallTokenCredentials {
+use crate::{providers::USER_AGENT, proxy_process::turn_configure::TurnCredentials};
+
+struct CallTokenCredentials
+{
   name: String,
   call_id: String,
 }
@@ -19,7 +20,8 @@ const OKCDN_APPLICATION_KEY: &str = "CGMMEJLGDIHBABABA";
 const VK_REALM: &str = "vk";
 const VK_API_VERSION: &str = "5.264";
 
-pub fn get_vk_call_id_from_link(link: &str) -> Result<&str> {
+pub fn get_vk_call_id_from_link(link: &str) -> Result<&str>
+{
   Ok(
     link
       .trim()
@@ -33,7 +35,8 @@ pub fn get_vk_call_id_from_link(link: &str) -> Result<&str> {
 pub async fn get_vk_calls_turn_credentials(
   call_id: String,
   with_name: Option<String>,
-) -> Result<TurnCredentials> {
+) -> Result<TurnCredentials>
+{
   let client = Client::builder().user_agent(USER_AGENT).build()?;
 
   let anonymous = CallTokenCredentials {
@@ -58,11 +61,13 @@ pub async fn get_vk_calls_turn_credentials(
   Ok(join_into_video_conversation(&client, call_id, call_token, okcdn_token).await?)
 }
 
-/// Позволяет получить анонимный токен пользователя ВКонтакте. Есть два разных случая:
+/// Позволяет получить анонимный токен пользователя ВКонтакте. Есть два разных
+/// случая:
 ///
 /// 1. Без `call_payload`, получает стандартный токен.
 /// 2. С `call_payload`, с которым можно уже войти в звонок.
-async fn get_anonymous_token(client: &Client, call_payload: Option<String>) -> Result<String> {
+async fn get_anonymous_token(client: &Client, call_payload: Option<String>) -> Result<String>
+{
   let url = "https://login.vk.ru/?act=get_anonym_token";
 
   let mut body = HashMap::from([
@@ -102,7 +107,8 @@ async fn get_anonymous_token(client: &Client, call_payload: Option<String>) -> R
 }
 
 /// Позволяет получить `call_payload` для токена
-async fn get_call_payload(client: &Client, access_token: String) -> Result<String> {
+async fn get_call_payload(client: &Client, access_token: String) -> Result<String>
+{
   let url = "https://api.vk.ru/method/calls.getAnonymousAccessTokenPayload";
 
   info!("Getting call payload...");
@@ -134,7 +140,8 @@ async fn get_call_token(
   client: &Client,
   access_token: String,
   credentials: CallTokenCredentials,
-) -> Result<String> {
+) -> Result<String>
+{
   let url = "https://api.vk.ru/method/calls.getAnonymousToken";
 
   info!("Getting call token for {}...", &credentials.call_id);
@@ -165,7 +172,8 @@ async fn get_call_token(
 }
 
 /// Получает OKCDN токен для звонка
-async fn get_okcdn_anonymous_token(client: &Client) -> Result<String> {
+async fn get_okcdn_anonymous_token(client: &Client) -> Result<String>
+{
   let url = "https://calls.okcdn.ru/fb.do";
   let device_id = Uuid::new_v4();
 
@@ -202,13 +210,15 @@ async fn get_okcdn_anonymous_token(client: &Client) -> Result<String> {
   )
 }
 
-/// Входит в видео конференцию ВКонтакте, получая тем самым учётные данные для TURN-сервера
+/// Входит в видео конференцию ВКонтакте, получая тем самым учётные данные для
+/// TURN-сервера
 async fn join_into_video_conversation(
   client: &Client,
   call_id: String,
   call_token: String,
   okcdn_token: String,
-) -> Result<TurnCredentials> {
+) -> Result<TurnCredentials>
+{
   let url = "https://calls.okcdn.ru/fb.do";
 
   info!("Joining into video conversation {}...", &call_id);

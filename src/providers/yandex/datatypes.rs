@@ -1,7 +1,8 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize)]
-pub struct ConferenceResponse {
+pub struct ConferenceResponse
+{
   pub peer_id: String,
   pub room_id: String,
   pub credentials: String,
@@ -9,18 +10,21 @@ pub struct ConferenceResponse {
 }
 
 #[derive(Deserialize)]
-pub struct MediaConfig {
+pub struct MediaConfig
+{
   pub media_server_url: String,
 }
 
 #[derive(Serialize)]
-pub struct HelloRequest {
+pub struct HelloRequest
+{
   pub uid: String,
   pub hello: HelloPayload,
 }
 
 #[derive(Serialize)]
-pub struct HelloPayload {
+pub struct HelloPayload
+{
   #[serde(rename = "participantMeta")]
   pub participant_meta: serde_json::Value,
   #[serde(rename = "participantAttributes")]
@@ -41,25 +45,29 @@ pub struct HelloPayload {
 }
 
 #[derive(Deserialize)]
-pub struct WssResponse {
+pub struct WssResponse
+{
   #[serde(rename = "serverHello")]
   pub server_hello: Option<ServerHello>,
 }
 
 #[derive(Deserialize)]
-pub struct ServerHello {
+pub struct ServerHello
+{
   #[serde(rename = "rtcConfiguration")]
   pub rtc_configuration: RtcConfig,
 }
 
 #[derive(Deserialize)]
-pub struct RtcConfig {
+pub struct RtcConfig
+{
   #[serde(rename = "iceServers")]
   pub ice_servers: Vec<IceServer>,
 }
 
 #[derive(Deserialize)]
-pub struct IceServer {
+pub struct IceServer
+{
   pub urls: Vec<String>,
   pub username: Option<String>,
   pub credential: Option<String>,

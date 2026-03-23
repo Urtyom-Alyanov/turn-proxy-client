@@ -1,6 +1,6 @@
+use std::{net::SocketAddr, sync::Arc, time::Duration};
+
 use anyhow::{Result, anyhow};
-use std::{net::SocketAddr, sync::Arc};
-use std::time::Duration;
 use tracing::{debug, info, warn};
 use webrtc_util::Conn;
 
@@ -17,7 +17,8 @@ pub async fn setup_and_run_provider(
   provider: &ProviderConfiguration,
   connection: Arc<dyn Conn + Send + Sync>,
   peer_addr: SocketAddr,
-) -> Result<Arc<dyn Conn + Send + Sync>> {
+) -> Result<Arc<dyn Conn + Send + Sync>>
+{
   match &provider.details {
     ProviderDetails::Direct => {
       info!("Try to direct connection with server...");
@@ -39,15 +40,15 @@ pub async fn setup_and_run_provider(
       };
       tokio::time::sleep(Duration::from_millis(200)).await;
 
-
-      info!("Connection established successfully");
+      info!("Connection via TURN Relay established successfully");
 
       Ok(turn as Arc<dyn Conn + Send + Sync>)
     }
   }
 }
 
-async fn fetch_creds(details: &ProviderDetails) -> Result<TurnCredentials> {
+async fn fetch_creds(details: &ProviderDetails) -> Result<TurnCredentials>
+{
   match details {
     ProviderDetails::Default { kind, link } => {
       let call_id = get_call_id_from_link(kind, link)?;
@@ -78,7 +79,8 @@ async fn fetch_creds(details: &ProviderDetails) -> Result<TurnCredentials> {
   }
 }
 
-fn get_call_id_from_link<'a>(kind: &DefaultProvider, link: &'a str) -> Result<&'a str> {
+fn get_call_id_from_link<'a>(kind: &DefaultProvider, link: &'a str) -> Result<&'a str>
+{
   match kind {
     DefaultProvider::VkCalls => get_vk_call_id_from_link(link),
     DefaultProvider::YandexTelemost => get_yandex_call_id_from_link(link),

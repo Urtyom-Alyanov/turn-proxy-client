@@ -1,22 +1,24 @@
 mod datatypes;
 
-use crate::providers::USER_AGENT;
-use crate::providers::yandex::datatypes::{
-  ConferenceResponse, HelloPayload, HelloRequest, WssResponse,
-};
-use crate::proxy_process::turn_configure::TurnCredentials;
+use std::sync::LazyLock;
 
 use anyhow::{Context, Result, anyhow};
+use futures_util::{sink::SinkExt, stream::StreamExt};
 use reqwest::header::{HeaderMap, HeaderValue};
 use serde_json::json;
-use std::sync::LazyLock;
-use tokio_tungstenite::connect_async;
-use tokio_tungstenite::tungstenite::handshake::client::Request as TungsteniteRequest;
-use tokio_tungstenite::tungstenite::protocol::Message;
+use tokio_tungstenite::{
+  connect_async,
+  tungstenite::{handshake::client::Request as TungsteniteRequest, protocol::Message},
+};
 use uuid::Uuid;
 
-use futures_util::sink::SinkExt;
-use futures_util::stream::StreamExt;
+use crate::{
+  providers::{
+    USER_AGENT,
+    yandex::datatypes::{ConferenceResponse, HelloPayload, HelloRequest, WssResponse},
+  },
+  proxy_process::turn_configure::TurnCredentials,
+};
 
 const YANDEX_REALM: &str = "yandex";
 const YANDEX_SERVICE_NAME: &str = "telemost";
@@ -52,7 +54,8 @@ static YANDEX_CAPABILITIES_OFFER: LazyLock<serde_json::Value> = LazyLock::new(||
   })
 });
 
-pub fn get_yandex_call_id_from_link(link: &str) -> Result<&str> {
+pub fn get_yandex_call_id_from_link(link: &str) -> Result<&str>
+{
   Ok(
     link
       .trim()
@@ -65,7 +68,8 @@ pub fn get_yandex_call_id_from_link(link: &str) -> Result<&str> {
 pub async fn get_yandex_telebridge_turn_credentials(
   call_id: &str,
   with_name: Option<String>,
-) -> Result<TurnCredentials> {
+) -> Result<TurnCredentials>
+{
   let client = reqwest::Client::new();
   let endpoint = format!(
     "https://cloud-api.yandex.ru/telemost_front/v2/telemost/conferences/https%3A%2F%2Ftelemost.yandex.ru%2Fj%2F{}/connection?next_gen_media_platform_allowed=false",
@@ -156,7 +160,8 @@ pub async fn get_yandex_telebridge_turn_credentials(
   Err(anyhow!("Failed to extract TURN creds from Yandex WS"))
 }
 
-fn ws_request_builder(url: &str) -> Result<TungsteniteRequest> {
+fn ws_request_builder(url: &str) -> Result<TungsteniteRequest>
+{
   let request = TungsteniteRequest::builder()
     .uri(url)
     .header("Origin", "https://telemost.yandex.ru")

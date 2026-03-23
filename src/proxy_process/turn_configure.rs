@@ -1,12 +1,14 @@
-use anyhow::Result;
 use std::sync::Arc;
+
+use anyhow::Result;
 use tracing::{debug, info};
 use turn::client::{Client as StunClient, ClientConfig as TurnClientConfig};
 use webrtc_util::Conn;
 
 use crate::proxy_process::turn_connection::TurnConn;
 
-pub struct TurnCredentials {
+pub struct TurnCredentials
+{
   pub username: String,
   pub password: String,
   pub realm: String,
@@ -14,11 +16,13 @@ pub struct TurnCredentials {
   pub stun_addr: Option<String>,
 }
 
-/// Настройка подключения к TURN-серверу с полученными учётными данными от поставщика
+/// Настройка подключения к TURN-серверу с полученными учётными данными от
+/// поставщика
 pub async fn turn_configure(
   secure_conn: Arc<dyn Conn + Send + Sync>,
   credentials: TurnCredentials,
-) -> Result<Arc<TurnConn>> {
+) -> Result<Arc<TurnConn>>
+{
   debug!("Setting up connection with {}...", &credentials.turn_addr);
 
   let client_config = TurnClientConfig {
